@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>资源分享网站</title>
+    <style>
+        body { font-family: 'Microsoft YaHei', Arial, sans-serif; max-width: 1200px; margin: 0 auto; padding: 30px; background-color: #f5f5f5; }
+        header { text-align: center; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid #ddd; }
+        h1 { color: #333; font-size: 28px; }
+        .content-container { background-color: white; border-radius: 8px; padding: 40px; box-shadow: 0 2px 15px rgba(0,0,0,0.1); min-height: 400px; }
+        .upload-area { text-align: center; margin-bottom: 40px; }
+        .empty-message { color: #888; font-size: 18px; text-align: center; margin: 50px 0; }
+        .upload-btn { background-color: #4CAF50; color: white; border: none; padding: 14px 28px; font-size: 18px; border-radius: 4px; cursor: pointer; transition: background-color 0.3s; }
+        .upload-btn:hover { background-color: #45a049; }
+        #fileInput { display: none; }
+        .file-list { margin-top: 30px; }
+        .file-list-title { font-size: 20px; color: #333; margin-bottom: 15px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .file-item { padding: 15px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+        .file-item:hover { background-color: #f9f9f9; }
+        .file-info { flex: 1; }
+        .file-name { font-size: 16px; color: #333; }
+        .file-meta { font-size: 14px; color: #888; margin-top: 5px; }
+        .file-actions { margin-left: 20px; }
+        .download-btn { color: #2196F3; text-decoration: none; padding: 8px 15px; border: 1px solid #2196F3; border-radius: 4px; transition: all 0.3s; }
+        .download-btn:hover { background-color: #2196F3; color: white; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>资源分享网站</h1>
+    </header>
+    
+    <div class="content-container">
+        <div class="upload-area">
+            <input type="file" id="fileInput" multiple>
+            <button class="upload-btn" onclick="document.getElementById('fileInput').click()">上传资源</button>
+        </div>
+        
+        <div class="file-list" id="fileList">
+            <div class="file-list-title">已上传文件</div>
+            <div class="empty-message" id="emptyMessage">还没有上传的文件</div>
+        </div>
+    </div>
+
+    <script>
+        // 已替换成你的信息！！！
+        const GITHUB_USER = 'mcrrgtts3d';          
+        const GITHUB_REPO = 'mcrrgtts3d.github.io';
+        const GITHUB_BRANCH = 'main';              
+        const GITHUB_TOKEN = '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'; // 你的令牌已填入
+        // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+        const fileInput = document.getElementById('fileInput');
+        const fileList = document.getElementById('fileList');
+        const emptyMessage = document.getElementById('emptyMessage');
+
+        window.onload = loadFiles;
+
+        fileInput.addEventListener('change', function(e) {
+            const files = e.target.files;
+            if (files.length > 0) {
+                uploadFilesToGitHub(files);
+            }
+        });
+
+        async function uploadFilesToGitHub(files) {
+            for (const file of files) {
+                try {
+                    const fileContent = await readFileAsBase64(file);
+                    const apiUrl = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${file.name}`;
+                    const response = await fetch(apiUrl, {
+                        method: 'PUT',
+                        headers: {
+                            'Authorization': `token ${GITHUB_TOKEN}`,
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            message: `Upload file: ${file.name}`,
+                            content: fileContent,
+                            branch: GITHUB_BRANCH,
+                        }),
+                    });
+
+                    const data = await response.json();
+                    if (response.ok) {
+                        alert(`文件 ${file.name} 已上传到 GitHub 仓库！`);
+                    } else {
+                        alert(`上传失败: ${data.message}`);
+                    }
+                } catch (error) {
+                    alert(`文件 ${file.name} 上传出错: ${error}`);
+                }
+            }
+            loadFiles();
+        }
+
+        function readFileAsBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        async function loadFiles() {
+            try {
+                const apiUrl = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/`;
+                const response = await fetch(apiUrl);
+                const data = await response.json();
+
+                if (response.ok) {
+                    fileList.innerHTML = `
+                        <div class="file-list-title">已上传文件</div>
+                        <div class="empty-message" id="emptyMessage">还没有上传的文件</div>
+                    `;
+                    const emptyMessage = document.getElementById('emptyMessage');
+
+                    if (data.length === 0) {
+                        emptyMessage.style.display = 'block';
+                    } else {
+                        emptyMessage.style.display = 'none';
+                        const files = data.filter(item => item.type === 'file');
+                        files.forEach(item => {
+                            const fileItem = document.createElement('div');
+                            fileItem.className = 'file-item';
+                            fileItem.innerHTML = `
+                                <div class="file-info">
+                                    <div class="file-name">${item.name}</div>
+                                    <div class="file-meta">大小: ${formatFileSize(item.size)} | 上传时间: ${new Date(item.updated_at).toLocaleString()}</div>
+                                </div>
+                                <div class="file-actions">
+                                    <a href="${item.download_url}" class="download-btn" download>下载</a>
+                                </div>
+                            `;
+                            fileList.appendChild(fileItem);
+                        });
+                    }
+                } else {
+                    alert(`加载文件失败: ${data.message}`);
+                }
+            } catch (error) {
+                alert(`加载文件出错: ${error}`);
+            }
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+    </script>
+</body>
+</html>
